@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -37,31 +38,62 @@ func main() {
 		log.Fatalf("Error fetching HTML: %v", err)
 	}
 
-	waits, err := ParseWaits(html)
+	currentWaits, err := ParseWaits(html)
 	if err != nil {
 		log.Fatalf("Error parsing HTML: %v", err)
 	}
 
-	last, err := GetLatestWaits(filename)
+	lastWaits, err := GetLatestWaits(filename)
 	if err != nil {
 		log.Fatalf("Error fetching latest waits: %v", err)
 	}
 
-	if err := StoreWaits(filename, waits); err != nil {
+	if err := StoreWaits(filename, currentWaits); err != nil {
 		log.Fatalf("Error storing data: %v", err)
 	}
 
-	if len(last) == 0 {
+	if len(lastWaits) == 0 {
 		log.Printf("No previous data, exiting")
 		return
 	}
 
-	// for _, wait := range waits {
-	// 	fmt.Printf("%2d  %2dmin  %s\n", wait.Id, wait.Minutes, wait.Location)
-	// }
+	// Determine wait time changes
+	haveChanges := false
+	messageLines := make([]string, len(ids))
+	for i, id := range ids {
+		var last, current Wait
+		for _, wait := range lastWaits {
+			if wait.Id == id {
+				last = wait
+				break
+			}
+		}
+		for _, wait := range currentWaits {
+			if wait.Id == id {
+				current = wait
+				break
+			}
+		}
 
-	// body := "Inova Fairfax Hospital decreased to 14min\nInova Emergency Room - Fairfax increased to 7min"
-	// if err := SendMessage(body); err != nil {
-	// 	log.Fatalf("Error sending message: %v", err)
-	// }
+		dir := "remains at"
+		if last.Minutes > current.Minutes {
+			dir = "decreased to"
+			haveChanges = true
+		} else if last.Minutes < current.Minutes {
+			dir = "increased to"
+			haveChanges = true
+		}
+
+		messageLines[i] = fmt.Sprintf("%s %s %dmin", current.Location, dir, current.Minutes)
+	}
+
+	if !haveChanges {
+		log.Printf("No time changes since last check. Exiting")
+		return
+	}
+
+	body := strings.Join(messageLines, "\n\n")
+	if err := SendMessage(body); err != nil {
+		log.Fatalf("Error sending message: %v", err)
+	}
 }
