@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"time"
 )
@@ -36,6 +37,10 @@ func GetLatestWaits(filename string) (waits []Wait, err error) {
 
 	waits = make([]Wait, len(store.Locations))
 	last := len(store.Minutes) - 1
+	if len(store.Minutes[last]) != len(store.Locations) {
+		log.Printf("Error: Last minutes only has %d items! Using previous record.", len(store.Minutes[last]))
+		last--
+	}
 	for i := range store.Locations {
 		waits[i].Id = i + 1
 		waits[i].Location = store.Locations[i]
